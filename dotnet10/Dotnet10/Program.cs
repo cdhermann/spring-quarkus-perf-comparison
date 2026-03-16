@@ -1,18 +1,11 @@
-using Dotnet10;
 using Dotnet10.Data;
 using Dotnet10.Dto;
 using Dotnet10.Repository;
 using Dotnet10.Service;
-using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Prometheus;
 
 var builder = WebApplication.CreateSlimBuilder(args);
-
-// ── JSON ──────────────────────────────────────────────────────────────────────
-// Source-generated context – equivalent to enable-reflection-free-serializers: true
-builder.Services.Configure<JsonOptions>(opts =>
-    opts.SerializerOptions.TypeInfoResolverChain.Insert(0, FruitJsonContext.Default));
 
 // ── Database ──────────────────────────────────────────────────────────────────
 // Equivalent to quarkus-jdbc-postgresql + quarkus-hibernate-orm-panache.

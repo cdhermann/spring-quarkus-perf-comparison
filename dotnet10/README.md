@@ -76,46 +76,12 @@ The server listens on **http://localhost:8080**, matching the Quarkus default.
 
 ## Native mode
 
-**Not supported.** This project cannot be compiled to a native binary with the current
-version of EF Core. The managed-mode binary (`dotnet publish -c Release`) is the valid
-comparison point against the Quarkus JVM build.
+**Not supported.** EF Core's NativeAOT support is still experimental and not suited for
+production use. See the official Microsoft documentation for details:
+[NativeAOT Support and Precompiled Queries (Experimental) – EF Core](https://learn.microsoft.com/en-us/ef/core/performance/nativeaot-and-precompiled-queries)
 
-### Why NativeAOT does not work with EF Core
-
-.NET NativeAOT compiles the entire application to a self-contained native binary at
-build time. At runtime there is no JIT compiler and no dynamic code generation of any
-kind. EF Core relies on both in two separate places:
-
-**Problem 1 — model building.** At startup, EF Core reflects over entity classes,
-reads annotations, and builds an `IModel` that describes the full database schema.
-This process uses reflection APIs that the AOT linker removes, producing:
-
-```txt
-InvalidOperationException: Model building is not supported when publishing with NativeAOT.
-```
-
-**Problem 2 — LINQ query translation.** At runtime, every LINQ query (`.Where()`,
-`.OrderBy()`, `.Include()`) is compiled from an expression tree into SQL using
-`System.Reflection.Emit`. This is dynamic code generation, which NativeAOT forbids:
-
-```txt
-InvalidOperationException: Query wasn't precompiled and dynamic code isn't supported (NativeAOT).
-```
-
-### Why the existing workarounds did not work
-
-EF Core 9 ships two partial solutions:
-
-- **`dotnet ef dbcontext optimize`** pre-generates the model as static C# files,
-  solving Problem 1. This worked.
-- **`Microsoft.EntityFrameworkCore.Tasks`** is a build-time source generator that is
-  supposed to emit SQL interceptors for LINQ queries, solving Problem 2. In practice it
-  failed on every query — including bare `context.Stores.ToListAsync()` — with
-  *"Dynamic LINQ queries are not supported when precompiling queries"*.
-
-Replacing EF Core with raw Npgsql SQL would fix the runtime errors but destroy the
-comparability of the benchmark: the whole point is to compare equivalent ORM-based
-stacks. If .NET uses raw SQL, Quarkus would have to use raw SQL too.
+The managed-mode binary (`dotnet publish -c Release`) is the valid comparison point
+against the Quarkus JVM build.
 
 ### Why Quarkus native image works
 
@@ -202,9 +168,9 @@ dotnet test
 | Health checks | `quarkus-smallrye-health` | `AddHealthChecks()` + `AddDbContextCheck<T>()` |
 | Metrics | `quarkus-micrometer-registry-prometheus` | `prometheus-net.AspNetCore` |
 | JSON null handling | `serialization-inclusion: non-empty` | `JsonIgnoreCondition.WhenWritingNull` |
-| Reflection-free JSON | `enable-reflection-free-serializers: true` | `[JsonSerializable]` source-generated `FruitJsonContext` |
-| AOT build flag | `./mvnw clean package -Pnative` | Not supported – EF Core LINQ translator requires dynamic code |
-| AOT output | `target/app-runner` (GraalVM native image) | Not available (see Native mode section) |
+| Reflection-free JSON | `enable-reflection-free-serializers: true` | Standard reflection-based `System.Text.Json` |
+| AOT build flag | `./mvnw clean package -Pnative` | Not supported – [EF Core NativeAOT is experimental](https://learn.microsoft.com/en-us/ef/core/performance/nativeaot-and-precompiled-queries) |
+| AOT output | `target/app-runner` (GraalVM native image) | Not available |
 | Unit test framework | JUnit 5 + `@QuarkusTest` | xUnit |
 | Unit test mock | `@InjectMock` (Mockito) | Hand-written `FakeFruitRepository` |
 | Unit test target | `FruitController` via HTTP | `FruitService` directly |
