@@ -168,7 +168,7 @@ dotnet test
 | Health checks | `quarkus-smallrye-health` | `AddHealthChecks()` + `AddDbContextCheck<T>()` |
 | Metrics | `quarkus-micrometer-registry-prometheus` | `prometheus-net.AspNetCore` |
 | JSON null handling | `serialization-inclusion: non-empty` | `JsonIgnoreCondition.WhenWritingNull` |
-| Reflection-free JSON | `enable-reflection-free-serializers: true` | Standard reflection-based `System.Text.Json` |
+| Reflection-free JSON | `enable-reflection-free-serializers: true` | Source-generated `System.Text.Json` (`JsonSerializerContext`) |
 | AOT build flag | `./mvnw clean package -Pnative` | Not supported – [EF Core NativeAOT is experimental](https://learn.microsoft.com/en-us/ef/core/performance/nativeaot-and-precompiled-queries) |
 | AOT output | `target/app-runner` (GraalVM native image) | Not available |
 | Unit test framework | JUnit 5 + `@QuarkusTest` | xUnit |
