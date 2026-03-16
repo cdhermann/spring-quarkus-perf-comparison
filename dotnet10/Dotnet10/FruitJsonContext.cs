@@ -6,8 +6,7 @@ namespace Dotnet10;
 /// <summary>
 /// Source-generated JSON serializer context for all DTO types.
 ///
-/// Replaces runtime reflection for JSON serialization, required for Native AOT.
-/// Equivalent to:
+/// /// Equivalent to:
 ///   quarkus.rest.jackson.optimization.enable-reflection-free-serializers: true
 /// </summary>
 [JsonSerializable(typeof(FruitDto))]
@@ -17,7 +16,7 @@ namespace Dotnet10;
 [JsonSerializable(typeof(StoreDto))]
 [JsonSerializable(typeof(AddressDto))]
 [JsonSourceGenerationOptions(
-    PropertyNamingPolicy        = JsonKnownNamingPolicy.CamelCase,
-    DefaultIgnoreCondition      = JsonIgnoreCondition.WhenWritingNull,
-    GenerationMode              = JsonSourceGenerationMode.Default)]
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    GenerationMode = JsonSourceGenerationMode.Default)]
 public partial class FruitJsonContext : JsonSerializerContext;

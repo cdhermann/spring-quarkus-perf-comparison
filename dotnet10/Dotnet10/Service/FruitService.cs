@@ -13,11 +13,9 @@ public class FruitService(IFruitRepository fruitRepository)
 {
     /// <summary>Returns all fruits as DTOs. Equivalent to getAllFruits() @Transactional(SUPPORTS).</summary>
     public async Task<List<FruitDto>> GetAllFruitsAsync() =>
-        (await fruitRepository.ListAllAsync())
+        [.. (await fruitRepository.ListAllAsync())
             .Select(FruitMapper.Map)
-            .Where(dto => dto is not null)
-            .Cast<FruitDto>()
-            .ToList();
+            .OfType<FruitDto>()];
 
     /// <summary>
     /// Finds a fruit by name. Equivalent to getFruitByName() @Transactional(SUPPORTS).

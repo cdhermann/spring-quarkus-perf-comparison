@@ -8,9 +8,12 @@ namespace Dotnet10.Data;
 /// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public DbSet<Fruit> Fruits => Set<Fruit>();
-    public DbSet<Store> Stores => Set<Store>();
-    public DbSet<StoreFruitPrice> StoreFruitPrices => Set<StoreFruitPrice>();
+    // Idiomatisches EF-Core-Muster: auto-property mit null!-Initializer.
+    // Set<T>() als expression-body-getter ist unüblich und ruft intern
+    // ohnehin dieselbe gecachte Methode auf – der Unterschied ist nur stilistisch.
+    public DbSet<Fruit> Fruits { get; set; } = null!;
+    public DbSet<Store> Stores { get; set; } = null!;
+    public DbSet<StoreFruitPrice> StoreFruitPrices { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

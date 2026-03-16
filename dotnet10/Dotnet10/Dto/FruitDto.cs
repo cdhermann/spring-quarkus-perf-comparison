@@ -11,8 +11,7 @@ public record FruitDto(
 
     string? Description,
 
-    IReadOnlyList<StoreFruitPriceDto>? StorePrices
-)
+    IReadOnlyList<StoreFruitPriceDto>? StorePrices = null)
 {
     // Guarantee a non-null list for StorePrices – mirrors the null-coercion in the
     // Java compact constructor. C# positional records allow overriding a positional

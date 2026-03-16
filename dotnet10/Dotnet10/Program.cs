@@ -1,3 +1,4 @@
+using Dotnet10;
 using Dotnet10.Data;
 using Dotnet10.Dto;
 using Dotnet10.Repository;
@@ -6,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Prometheus;
 
 var builder = WebApplication.CreateSlimBuilder(args);
+
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.TypeInfoResolverChain.Insert(0, FruitJsonContext.Default));
 
 // ── Database ──────────────────────────────────────────────────────────────────
 // Equivalent to quarkus-jdbc-postgresql + quarkus-hibernate-orm-panache.

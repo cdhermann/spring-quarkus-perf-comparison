@@ -13,8 +13,7 @@ public static class FruitMapper
 
         var storePrices = fruit.StorePrices
             .Select(StoreFruitPriceMapper.Map)
-            .Where(dto => dto is not null)
-            .Cast<StoreFruitPriceDto>()
+            .OfType<StoreFruitPriceDto>()
             .ToList();
 
         return new FruitDto(fruit.Id, fruit.Name, fruit.Description, storePrices);
@@ -25,10 +24,6 @@ public static class FruitMapper
         if (dto is null)
             return null;
 
-        var fruit = new Fruit { Name = dto.Name, Description = dto.Description };
-
-        // The rest of the relationships aren't built out yet
-
-        return fruit;
+        return new Fruit { Name = dto.Name, Description = dto.Description };
     }
 }
