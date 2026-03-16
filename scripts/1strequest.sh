@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+
 # 1st argument is the command to execute
 # 2nd argument is the number of iterations. If not specified defaults to 1
 
@@ -33,6 +34,8 @@ if [ "$#" -eq 2 ]; then
   NUM_ITERATIONS=$2
 fi
 
+LC_NUMERIC=C
+
 for (( i=0; i<$NUM_ITERATIONS; i++))
 do
   # drop OS page cache entries, inode etc etc
@@ -47,6 +50,20 @@ do
   ${thisdir}/infra.sh -s
 
   ts=$(_date)
+
+if [[ "$1" != *.jar ]]; then
+  # .NET Environment variables to mimic Java -Xmx and -XX:ActiveProcessorCount:
+  # DOTNET_GCHeapHardLimit: Hard memory limit in hex (0x20000000 = 512MB)
+  # DOTNET_ProcessorCount: Limits the CPU cores the runtime perceives
+  # DOTNET_gcServer: Enables Server GC for high-throughput
+  export DOTNET_GCHeapHardLimit=0x20000000
+  export DOTNET_ProcessorCount=4
+  export DOTNET_gcServer=1
+
+  # Suppress logging
+  export Logging__LogLevel__Default=None
+fi
+
   $COMMAND &
   CURRENT_PID=$!
 
