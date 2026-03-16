@@ -35,6 +35,18 @@ if [ "$#" -eq 2 ]; then
 fi
 
 LC_NUMERIC=C
+if [[ "$1" != *.jar ]]; then
+  # .NET Environment variables to mimic Java -Xmx and -XX:ActiveProcessorCount:
+  # DOTNET_GCHeapHardLimit: Hard memory limit in hex (0x20000000 = 512MB)
+  # DOTNET_ProcessorCount: Limits the CPU cores the runtime perceives
+  # DOTNET_gcServer: Enables Server GC for high-throughput
+  export DOTNET_GCHeapHardLimit=0x20000000
+  export DOTNET_ProcessorCount=4
+  export DOTNET_gcServer=1
+
+  # Suppress logging
+  export Logging__LogLevel__Default=None
+fi
 
 for (( i=0; i<$NUM_ITERATIONS; i++))
 do
@@ -50,19 +62,6 @@ do
   ${thisdir}/infra.sh -s
 
   ts=$(_date)
-
-if [[ "$1" != *.jar ]]; then
-  # .NET Environment variables to mimic Java -Xmx and -XX:ActiveProcessorCount:
-  # DOTNET_GCHeapHardLimit: Hard memory limit in hex (0x20000000 = 512MB)
-  # DOTNET_ProcessorCount: Limits the CPU cores the runtime perceives
-  # DOTNET_gcServer: Enables Server GC for high-throughput
-  export DOTNET_GCHeapHardLimit=0x20000000
-  export DOTNET_ProcessorCount=4
-  export DOTNET_gcServer=1
-
-  # Suppress logging
-  export Logging__LogLevel__Default=None
-fi
 
   $COMMAND &
   CURRENT_PID=$!
