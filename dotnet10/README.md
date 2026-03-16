@@ -7,7 +7,14 @@
 1. Install .NET (see Prerequisites)
 2. Compile to managed mode with `dotnet publish Dotnet10 -c Release -o publish`
    (see Managed mode)
-3. From the Git project root run `./scripts/stress.sh dotnet10`
+3. From the Git project root run `./scripts/stress.sh dotnet10/publish/dotnet10`
+
+## How to run `1strequest.sh`
+
+1. Install .NET (see Prerequisites)
+2. Compile to managed mode with `dotnet publish Dotnet10 -c Release -o publish`
+   (see Managed mode)
+3. From the Git project root run `./scripts/1strequest.sh "dotnet10/publish/dotnet10" 5`
 
 ## Prerequisites
 
