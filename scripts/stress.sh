@@ -26,9 +26,7 @@ ${thisdir}/infra.sh -s
 # On Quarkus/Spring (Virtual Threads), this affects the Loom ForkJoin pool and Netty loops.
 # For .NET, we use DOTNET_ProcessorCount to achieve similar behavior.
 
-if [ "$1" = "dotnet10" ]; then
-  echo "Starting .NET 10 Application..."
-
+if [[ "$1" != *.jar ]]; then
   # .NET Environment variables to mimic Java -Xmx and -XX:ActiveProcessorCount:
   # DOTNET_GCHeapHardLimit: Hard memory limit in hex (0x20000000 = 512MB)
   # DOTNET_ProcessorCount: Limits the CPU cores the runtime perceives
@@ -37,11 +35,12 @@ if [ "$1" = "dotnet10" ]; then
   export DOTNET_ProcessorCount=4
   export DOTNET_gcServer=1
 
+  # Suppress logging
+  export Logging__LogLevel__Default=None
+
   # Launch the .NET binary
-  Logging__LogLevel__Default=None  ${callingdir}/dotnet10/publish/dotnet10 &
+  ${callingdir}/$1 &
 else
-  echo "Starting Java Application..."
-  
   # Standard Java execution with memory and CPU constraints
   java -XX:ActiveProcessorCount=4 -Xms512m -Xmx512m -jar ${callingdir}/$1 &
 fi
