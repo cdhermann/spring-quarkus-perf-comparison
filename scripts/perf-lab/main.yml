@@ -29,7 +29,7 @@ states:
   config.profiler.events: cpu
 
   config.repo.branch: main
-  config.repo.url: https://github.com/cdhermann/spring-quarkus-perf-comparison.git
+  config.repo.url: https://github.com/quarkusio/spring-quarkus-perf-comparison.git
 
   config.num_iterations: 3
 
