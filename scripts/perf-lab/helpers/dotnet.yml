@@ -1,0 +1,5 @@
+name: Dotnet related scripts
+scripts:
+  ensure-dotnet10:
+    - log: Showing Dotnet version
+    - sh: dotnet --version
