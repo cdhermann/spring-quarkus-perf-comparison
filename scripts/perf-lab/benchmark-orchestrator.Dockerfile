@@ -3,8 +3,10 @@ LABEL org.opencontainers.image.source="https://github.com/quarkusio/spring-quark
 
 USER root
 
-# Install system dependencies and container runtime
-RUN dnf install -y --allowerasing gcc zlib-devel git procps-ng curl file bash unzip zip sudo podman fuse-overlayfs slirp4netns shadow-utils
+# Install system dependencies, container runtime, and Java 21
+# Java installed via dnf so both amd64 and arm64 get native packages —
+# prevents JBang from downloading its own JDK (which fails on arm64).
+RUN dnf install -y --allowerasing gcc zlib-devel git procps-ng curl file bash unzip zip sudo podman fuse-overlayfs slirp4netns shadow-utils java-21-openjdk-devel
 
 # Set up subuid and subgid for rootless containers BEFORE creating user
 RUN touch /etc/subuid /etc/subgid && \
@@ -32,12 +34,10 @@ RUN . ~/.nvm/nvm.sh && \
     nvm install --lts && \
     nvm use --lts
 
-# Install jbang
-RUN curl -Ls https://sh.jbang.dev | bash -s - app setup
-
-# Install sdkman
-RUN curl -s "https://get.sdkman.io" | bash && \
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
+# Install SDKMAN, then use it to install JBang
+# SDKMAN handles arm64 natively; no separate JDK download needed (system Java 21 is used)
+RUN curl -s "https://get.sdkman.io" | bash
+RUN bash -c "source ~/.sdkman/bin/sdkman-init.sh && sdk install jbang"
 
 # Configure homebrew
 # ENV HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew \
