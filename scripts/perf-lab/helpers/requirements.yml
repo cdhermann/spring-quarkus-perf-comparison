@@ -2,6 +2,7 @@ name: Requirements needed to run benchmarks
 scripts:
   ensure-requirements:
     - script: ensure-graalvm
+    - script: ensure-mandrel
     - script: ensure-java
     - script: ensure-git
     - script: ensure-gcc
