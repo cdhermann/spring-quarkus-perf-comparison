@@ -40,11 +40,17 @@ help() {
   echo "  --drop-fs-caches                                        Purge/drop OS filesystem caches between iterations"
   echo "  --extra-qdup-args <EXTRA_QDUP_ARGS>                     Any extra arguments that need to be passed to qDup ahead of the qDup scripts"
   echo "                                                              NOTE: This is an advanced option. Make sure you know what you are doing when using it."
-  echo "  --graalvm-home <GRAALVM_HOME>                           Path to a locally installed GraalVM/Mandrel distribution"
+  echo "  --graalvm-home <GRAALVM_HOME>                           Path to a locally installed GraalVM distribution"
   echo "                                                              If set, this takes precedence over --graalvm-version"
-  echo "  --graalvm-version <GRAALVM_VERSION>                     The GraalVM version to use if running any native tests (from SDKMAN)"
+  echo "  --graalvm-version <GRAALVM_VERSION>                     The GraalVM version to use for quarkus3-native (from SDKMAN)"
   echo "                                                              Default: ${GRAALVM_VERSION}"
   echo "                                                              Ignored if --graalvm-home is set"
+  echo "  --mandrel-home <MANDREL_HOME>                           Path to a locally installed Mandrel distribution"
+  echo "                                                              If set, this takes precedence over --mandrel-version"
+  echo "  --mandrel-version <MANDREL_VERSION>                     The Mandrel version to use for quarkus3-native-mandrel (from SDKMAN)"
+  echo "                                                              Required when running quarkus3-native-mandrel"
+  echo "                                                              Default: ${MANDREL_VERSION}"
+  echo "                                                              Ignored if --mandrel-home is set"
   echo "  --host <HOST>                                           The HOST to run the benchmarks on"
   echo "                                                              LOCAL is a keyword that can be used to run everything on the local machine"
   echo "                                                              Default: ${HOST}"
@@ -142,6 +148,8 @@ print_values() {
   echo "  CPUS_FIRST_REQUEST=$CPUS_FIRST_REQUEST"
   echo "  GRAALVM_HOME: $GRAALVM_HOME"
   echo "  GRAALVM_VERSION: $GRAALVM_VERSION"
+  echo "  MANDREL_HOME: $MANDREL_HOME"
+  echo "  MANDREL_VERSION: $MANDREL_VERSION"
   echo "  HOST: $HOST"
   echo "  ITERATIONS: $ITERATIONS"
   echo "  JAVA_HOME: $JAVA_HOME"
@@ -293,6 +301,8 @@ ${JBANG_CMD} io.hyperfoil.tools:qDup:0.11.0 \
     ./helpers/ \
     -S config.jvm.graalvm.home="${GRAALVM_HOME}" \
     -S config.jvm.graalvm.version=${GRAALVM_VERSION} \
+    -S config.jvm.mandrel.home="${MANDREL_HOME}" \
+    -S config.jvm.mandrel.version="${MANDREL_VERSION}" \
     -S config.jvm.home="${JAVA_HOME}" \
     -S config.jvm.version=${JAVA_VERSION} \
     -S config.quarkus.native_build_options="${NATIVE_QUARKUS_BUILD_OPTIONS}" \
@@ -349,6 +359,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   SCENARIO_SET_BY_USER=""
   GRAALVM_HOME=""
   GRAALVM_VERSION="25.0.2-graalce"
+  MANDREL_HOME=""
+  MANDREL_VERSION=""
   HOST="LOCAL"
   ITERATIONS="3"
   JAVA_HOME=""
@@ -359,7 +371,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   PROFILER="none"
   QUARKUS_BUILD_CONFIG_ARGS=""
   QUARKUS_VERSION=""
-  ALLOWED_RUNTIMES=("quarkus3-jvm" "quarkus3-leyden" "quarkus3-virtual" "quarkus3-virtual-leyden" "quarkus3-native" "spring3-jvm" "spring3-leyden" "spring3-virtual" "spring3-virtual-leyden" "spring3-jvm-aot" "spring3-native" "spring4-jvm" "spring4-leyden" "spring4-virtual" "spring4-virtual-leyden" "spring4-jvm-aot" "spring4-native" "dotnet10")
+  ALLOWED_RUNTIMES=("quarkus3-jvm" "quarkus3-leyden" "quarkus3-virtual" "quarkus3-virtual-leyden" "quarkus3-native" "quarkus3-native-mandrel" "spring3-jvm" "spring3-leyden" "spring3-virtual" "spring3-virtual-leyden" "spring3-jvm-aot" "spring3-native" "spring4-jvm" "spring4-leyden" "spring4-virtual" "spring4-virtual-leyden" "spring4-jvm-aot" "spring4-native" "dotnet10")
   DEFAULT_RUNTIMES=("quarkus3-jvm" "quarkus3-leyden" "quarkus3-virtual" "quarkus3-virtual-leyden" "quarkus3-native" "spring3-jvm" "spring3-leyden" "spring3-virtual" "spring3-virtual-leyden" "spring3-native" "spring4-jvm" "spring4-leyden" "spring4-virtual" "spring4-virtual-leyden" "spring4-native" "dotnet10")
   RUNTIMES=${DEFAULT_RUNTIMES[@]}
   SPRING_BOOT3_VERSION=""
@@ -431,6 +443,16 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
       --graalvm-version)
         GRAALVM_VERSION="$2"
+        shift 2
+        ;;
+
+      --mandrel-home)
+        MANDREL_HOME="$2"
+        shift 2
+        ;;
+
+      --mandrel-version)
+        MANDREL_VERSION="$2"
         shift 2
         ;;
 

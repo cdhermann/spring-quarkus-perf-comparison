@@ -29,6 +29,45 @@ scripts:
     - log: Showing GraalVM version
     - sh: $GRAALVM_HOME/bin/java -version
 
+  ensure-mandrel:
+    - sh: echo "${{config.jvm.mandrel.home:}}"
+      then:
+        - regex: ^$
+          then:
+            - sh: echo "${{config.jvm.mandrel.version:}}"
+              then:
+                - regex: ^$
+                  then:
+                    - log: No Mandrel version or home configured — skipping Mandrel setup
+                  else:
+                    # No local Mandrel path provided, use SDKMAN
+                    - script: sdk-select-java
+                      with:
+                        java_version: ${{config.jvm.mandrel.version}}
+                        install_if_missing: true
+                    - log: Setting MANDREL_HOME from SDKMAN
+                    - sh: export MANDREL_HOME=$(sdk home java ${{config.jvm.mandrel.version}})
+          else:
+            # Local Mandrel path provided
+            - log: Using locally installed Mandrel from ${{config.jvm.mandrel.home}}
+            - sh: export MANDREL_HOME=${{config.jvm.mandrel.home}}
+            - sh: test -d "$MANDREL_HOME"
+              then:
+                - regex: ".*"
+                  else:
+                    - abort: Mandrel home directory does not exist at ${{config.jvm.mandrel.home}}
+            - sh: test -x "$MANDREL_HOME/bin/native-image"
+              then:
+                - regex: ".*"
+                  else:
+                    - abort: Mandrel native-image executable not found or not executable at ${{config.jvm.mandrel.home}}/bin/native-image
+    - sh: echo "${{config.jvm.mandrel.version:}}${{config.jvm.mandrel.home:}}"
+      then:
+        - regex: ^$
+          else:
+            - log: Showing Mandrel version
+            - sh: $MANDREL_HOME/bin/java -version
+
   ensure-java:
     - sh: echo "${{config.jvm.home:}}"
       then:
