@@ -69,7 +69,8 @@ ${BOLD}What this script does:${NC}
   3. Installs the public key on the remote host (passwordless SSH login)
   4. Configures passwordless sudo for the remote user
   5. Verifies the remote shell environment
-  6. Prints example run-benchmarks.sh commands
+  6. Ensures the C/C++ build toolchain is present (required for native image builds)
+  7. Prints example run-benchmarks.sh commands
 
 ${BOLD}After a successful run:${NC}
   cd scripts/perf-lab
@@ -243,7 +244,103 @@ setup_passwordless_sudo() {
   fi
 }
 
-# ─── 5. Remote environment verification ───────────────────────────────────────
+# ─── 5. C/C++ build toolchain ────────────────────────────────────────────────
+ensure_build_toolchain() {
+  step "C/C++ build toolchain"
+
+  # Check each required tool independently so we install anything that's missing
+  # even if some tools are already present.
+  local need_gcc=false need_zlib=false
+
+  if ssh_batch "command -v gcc" &>/dev/null; then
+    local gcc_ver
+    gcc_ver=$(ssh_batch "gcc --version 2>/dev/null | head -1")
+    ok "gcc: $gcc_ver"
+  else
+    warn "gcc not found"
+    need_gcc=true
+  fi
+
+  # Probe for zlib dev headers via the pkg-config or a direct header check.
+  if ssh_batch "pkg-config --exists zlib 2>/dev/null || test -f /usr/include/zlib.h" &>/dev/null; then
+    ok "zlib dev headers: present"
+  else
+    warn "zlib dev headers not found (GraalVM native-image linker requires -lz)"
+    need_zlib=true
+  fi
+
+  if ! $need_gcc && ! $need_zlib; then
+    return
+  fi
+
+  if $CHECK_ONLY; then
+    $need_gcc  && warn "Re-run without --check-only to install the C/C++ toolchain."
+    $need_zlib && warn "Re-run without --check-only to install zlib dev headers."
+    return
+  fi
+
+  info "Detecting Linux distribution …"
+
+  local distro_id distro_like
+  distro_id=$(ssh_batch ". /etc/os-release && echo \$ID" 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+  distro_like=$(ssh_batch ". /etc/os-release && echo \${ID_LIKE:-}" 2>/dev/null | tr '[:upper:]' '[:lower:]')
+
+  local pkg_cmd="" pre_cmd=""
+  case "$distro_id" in
+    ubuntu|debian|linuxmint|pop)
+      pre_cmd="apt-get update -y"
+      pkg_cmd="apt-get install -y build-essential zlib1g-dev" ;;
+    fedora)
+      pkg_cmd="dnf install -y gcc gcc-c++ make zlib-devel" ;;
+    rhel|centos|almalinux|rocky)
+      pkg_cmd="dnf groupinstall -y 'Development Tools' && sudo dnf install -y zlib-devel" ;;
+    opensuse*|sles)
+      pkg_cmd="zypper install -y gcc gcc-c++ make zlib-devel" ;;
+    arch|manjaro)
+      pkg_cmd="pacman -Sy --noconfirm base-devel" ;;
+    *)
+      if [[ "$distro_like" == *debian* || "$distro_like" == *ubuntu* ]]; then
+        pre_cmd="apt-get update -y"
+        pkg_cmd="apt-get install -y build-essential zlib1g-dev"
+      elif [[ "$distro_like" == *fedora* || "$distro_like" == *rhel* ]]; then
+        pkg_cmd="dnf install -y gcc gcc-c++ make zlib-devel"
+      else
+        warn "Unknown distribution '$distro_id' — cannot auto-install the build toolchain."
+        warn "Please install gcc and zlib dev headers manually (e.g. 'build-essential zlib1g-dev' on Debian/Ubuntu)."
+        return
+      fi ;;
+  esac
+
+  if [[ -n "$pre_cmd" ]]; then
+    info "Refreshing package lists: sudo $pre_cmd"
+    ssh_batch "sudo $pre_cmd" || warn "Package list update failed — will try installing anyway."
+  fi
+
+  info "Installing build toolchain on remote host: sudo $pkg_cmd"
+  ssh_batch "sudo $pkg_cmd" || die "Failed to install build toolchain. Install manually with: sudo $pkg_cmd"
+
+  # Verify both tools are now present
+  local post_failed=0
+  if ssh_batch "command -v gcc" &>/dev/null; then
+    local gcc_ver
+    gcc_ver=$(ssh_batch "gcc --version 2>/dev/null | head -1")
+    ok "gcc installed: $gcc_ver"
+  else
+    err "gcc still not found after installation."
+    (( post_failed++ )) || true
+  fi
+  if ssh_batch "pkg-config --exists zlib 2>/dev/null || test -f /usr/include/zlib.h" &>/dev/null; then
+    ok "zlib dev headers: installed"
+  else
+    err "zlib dev headers still not found after installation."
+    (( post_failed++ )) || true
+  fi
+  if [[ $post_failed -gt 0 ]]; then
+    die "Build toolchain installation incomplete — $post_failed component(s) still missing."
+  fi
+}
+
+# ─── 6. Remote environment verification ───────────────────────────────────────
 verify_remote_environment() {
   step "Verifying remote environment"
 
@@ -288,7 +385,7 @@ verify_remote_environment() {
   fi
 }
 
-# ─── 6. Summary ───────────────────────────────────────────────────────────────
+# ─── 7. Summary ───────────────────────────────────────────────────────────────
 print_summary() {
   echo
   echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -334,6 +431,7 @@ main() {
   setup_ssh_auth
   $SKIP_SUDO || setup_passwordless_sudo
   verify_remote_environment
+  ensure_build_toolchain
   print_summary
 }
 
