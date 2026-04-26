@@ -28,13 +28,21 @@ from pathlib import Path
 # ──────────────────────────────────────────────────────────────────────────────
 
 def extract_metrics(log_path: Path) -> dict:
-    """Find the echo '...' > /tmp/metrics.json line and parse the JSON."""
+    """Find the last echo '...' > /tmp/metrics.json line and parse the JSON.
+
+    A log file may contain multiple such lines when a run was retried or
+    preceded by a failed setup attempt.  The last occurrence is the one
+    that contains the actual benchmark results.
+    """
     pattern = re.compile(r"echo '(\{.*\})' > /tmp/metrics\.json")
+    last_match = None
     with open(log_path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             m = pattern.search(line)
             if m:
-                return json.loads(m.group(1))
+                last_match = m
+    if last_match:
+        return json.loads(last_match.group(1))
     raise ValueError(
         f"Could not find 'echo ... > /tmp/metrics.json' in {log_path}.\n"
         "Make sure the file is a complete qDup benchmark log."
