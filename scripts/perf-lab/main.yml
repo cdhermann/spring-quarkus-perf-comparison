@@ -735,6 +735,7 @@ scripts:
         - regex: "${{log_regex}}"
           then:
             - ctrlC
+            - sleep: 1s # give the main thread time to register wait-for before the signal fires
             - signal: LOG_REGEX_REACHED
       timer:
         1m:
