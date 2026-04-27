@@ -597,6 +597,16 @@ scripts:
         - script: sync-drop-fs-cache
         - set-signal: LOAD_STEADY_STATE_START 1
         - set-signal: LOG_REGEX_REACHED 1
+        - script:
+            # Start watch-log BEFORE the app so tail -f sees output as new lines.
+            # If watch-log is started after the app, tail reads the already-written
+            # "started" message as existing file content and fires the signal before
+            # the app is truly serving traffic (or before wrk has started).
+            name: watch-log
+            async: true
+          with:
+            log_file: ${{LOG_FILE}}
+            log_regex: ${{APP_LOG_REGEX}}
         - read-state: ${{config.profiler.name}}
           then:
             - regex: "^syncjfr$"
@@ -637,12 +647,6 @@ scripts:
                     format: ${{config.profiler.name}}
                     events: ${{config.profiler.events}}
                     delay: 10s
-        - script:
-            name: watch-log
-            async: true
-          with:
-            log_file: ${{LOG_FILE}}
-            log_regex: ${{APP_LOG_REGEX}}
         - wait-for: LOG_REGEX_REACHED
         - sh: ${{RUN.WRK_BIN}} -t 2 -c 100 -d 2m --timeout 2m ${{TARGET_URL}} 2>&1 >${{REPO_DIR}}/logs/wrk-warmup-${{RUNTIMECMD.name}}-${{ITERATION}}.log
         - regex: unable to connect
@@ -735,7 +739,6 @@ scripts:
         - regex: "${{log_regex}}"
           then:
             - ctrlC
-            - sleep: 1s # give the main thread time to register wait-for before the signal fires
             - signal: LOG_REGEX_REACHED
       timer:
         1m:
