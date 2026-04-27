@@ -15,6 +15,7 @@ If output.md is a directory the report is written there with a name derived
 from the input filename.
 """
 
+import itertools
 import json
 import math
 import os
@@ -156,6 +157,155 @@ def _table(headers, rows):
     for row in rows:
         lines.append("|" + "|".join(str(c) for c in row) + "|")
     return "\n".join(lines)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Statistical helpers (pure Python — no scipy required)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _stdev(vals: list) -> float | None:
+    """Sample standard deviation (n-1 denominator)."""
+    clean = [v for v in vals if v is not None]
+    n = len(clean)
+    if n < 2:
+        return None
+    mu = sum(clean) / n
+    return math.sqrt(sum((x - mu) ** 2 for x in clean) / (n - 1))
+
+
+def _cv(vals: list) -> float | None:
+    """Coefficient of variation as a percentage (std / |mean| × 100)."""
+    clean = [v for v in vals if v is not None]
+    if not clean:
+        return None
+    mu = sum(clean) / len(clean)
+    if mu == 0:
+        return None
+    sd = _stdev(clean)
+    return (sd / abs(mu)) * 100 if sd is not None else None
+
+
+# Two-tailed t critical values for 95% CI (α = 0.05), indexed by degrees of freedom.
+# df > 30 → 1.960 (normal approximation).
+_T_CRIT_95 = {
+    1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571,
+    6: 2.447,  7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228,
+    11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131,
+    16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086,
+    21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060,
+    26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042,
+}
+
+
+def _ci95(vals: list) -> tuple | None:
+    """95% confidence interval (lower, upper) via t-distribution."""
+    clean = [v for v in vals if v is not None]
+    n = len(clean)
+    if n < 2:
+        return None
+    mu = sum(clean) / n
+    sd = _stdev(clean)
+    if sd is None:
+        return None
+    se = sd / math.sqrt(n)
+    t = _T_CRIT_95.get(n - 1, 1.960)
+    return (mu - t * se, mu + t * se)
+
+
+def _betacf(x: float, a: float, b: float) -> float:
+    """Continued fraction for the incomplete beta function (modified Lentz method).
+    Follows the algorithm in Numerical Recipes (Press et al.)."""
+    MAX_ITER = 300
+    EPS = 3e-7
+    TINY = 1e-30
+    qab = a + b
+    qap = a + 1.0
+    qam = a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    if abs(d) < TINY:
+        d = TINY
+    d = 1.0 / d
+    h = d
+    for m in range(1, MAX_ITER + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < TINY:
+            d = TINY
+        c = 1.0 + aa / c
+        if abs(c) < TINY:
+            c = TINY
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < TINY:
+            d = TINY
+        c = 1.0 + aa / c
+        if abs(c) < TINY:
+            c = TINY
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < EPS:
+            break
+    return h
+
+
+def _ibeta(x: float, a: float, b: float) -> float:
+    """Regularised incomplete beta function I_x(a, b).
+    Used for computing Welch's t-test p-values without scipy."""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    # Use symmetry for better convergence
+    if x > (a + 1.0) / (a + b + 2.0):
+        return 1.0 - _ibeta(1.0 - x, b, a)
+    lbeta_ab = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+    front = math.exp(math.log(x) * a + math.log(1.0 - x) * b - lbeta_ab) / a
+    return front * _betacf(x, a, b)
+
+
+def _cohen_d(a: list, b: list) -> float | None:
+    """Cohen's d effect size between two samples (pooled standard deviation)."""
+    ca = [v for v in a if v is not None]
+    cb = [v for v in b if v is not None]
+    if len(ca) < 2 or len(cb) < 2:
+        return None
+    mu_a, mu_b = sum(ca) / len(ca), sum(cb) / len(cb)
+    sd_a, sd_b = _stdev(ca), _stdev(cb)
+    if sd_a is None or sd_b is None:
+        return None
+    n_a, n_b = len(ca), len(cb)
+    pooled = math.sqrt(((n_a - 1) * sd_a ** 2 + (n_b - 1) * sd_b ** 2) / (n_a + n_b - 2))
+    if pooled == 0:
+        return 0.0
+    return (mu_a - mu_b) / pooled
+
+
+def _welch_p(a: list, b: list) -> float | None:
+    """Two-sided p-value from Welch's t-test (unequal variances).
+    Implemented via the regularised incomplete beta function — no scipy needed."""
+    ca = [v for v in a if v is not None]
+    cb = [v for v in b if v is not None]
+    if len(ca) < 2 or len(cb) < 2:
+        return None
+    mu_a, mu_b = sum(ca) / len(ca), sum(cb) / len(cb)
+    sd_a, sd_b = _stdev(ca), _stdev(cb)
+    if sd_a is None or sd_b is None:
+        return None
+    n_a, n_b = len(ca), len(cb)
+    var_a, var_b = sd_a ** 2 / n_a, sd_b ** 2 / n_b
+    se = math.sqrt(var_a + var_b)
+    if se == 0:
+        return 1.0 if mu_a == mu_b else 0.0
+    t = abs(mu_a - mu_b) / se
+    # Welch–Satterthwaite degrees of freedom
+    df = (var_a + var_b) ** 2 / (var_a ** 2 / (n_a - 1) + var_b ** 2 / (n_b - 1))
+    # Two-tailed p-value:  p = I(df / (df + t²);  df/2,  0.5)
+    x = df / (df + t * t)
+    return min(_ibeta(x, df / 2.0, 0.5), 1.0)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -409,11 +559,11 @@ def section_native_stats(metrics: dict) -> str:
 def _raw_table(metric_name: str, runtimes: list[str], results: dict,
                extractor, unit: str, fmt_decimals: int = 2,
                max_not_avg: bool = False) -> str:
-    """Generic raw measurement table with per-iteration columns + average/max."""
+    """Generic raw measurement table: per-iteration columns + Average/Max + Std + CV%."""
     num_iter = max(len(extractor(results[r]) or []) for r in runtimes)
     iter_cols = [f"I{i}" for i in range(num_iter)]
     agg_label = "Max" if max_not_avg else "Average"
-    headers = ["Runtime"] + iter_cols + [agg_label]
+    headers = ["Runtime"] + iter_cols + [agg_label, "Std", "CV%"]
 
     rows = []
     for r in runtimes:
@@ -428,8 +578,12 @@ def _raw_table(metric_name: str, runtimes: list[str], results: dict,
             agg = max(vals) if max_not_avg else sum(vals) / len(vals)
             agg_str = _safe(agg, fmt_decimals, thousands=(fmt_decimals == 0 or agg > 999))
             row.append(f"**{agg_str}**")
+            sd = _stdev(vals)
+            cv = _cv(vals)
+            row.append(_safe(sd, fmt_decimals) if sd is not None else "—")
+            row.append(f"{cv:.1f}%" if cv is not None else "—")
         else:
-            row.append("—")
+            row.extend(["—", "—", "—"])
         rows.append(row)
 
     return f"### {metric_name} ({unit})\n\n{_table(headers, rows)}"
@@ -666,6 +820,161 @@ def section_key_tradeoffs(metrics: dict) -> str:
     return f"## Key Trade-offs\n\n{_table(['Goal', 'Best choice'], rows)}"
 
 
+def section_statistics(metrics: dict) -> str:
+    """Pairwise statistical significance: descriptive stats + Cohen's d + Welch p-value."""
+    results  = metrics.get("results", {})
+    runtimes = list(results.keys())
+    if len(runtimes) < 2:
+        return ""
+
+    METRICS_DEF = [
+        ("Build Time (s)",           lambda rd: rd.get("build",   {}).get("timings")),
+        ("Startup — TTFR (ms)",      lambda rd: rd.get("startup", {}).get("timings")),
+        ("RSS at startup (MiB)",     lambda rd: rd.get("rss",     {}).get("startup")),
+        ("RSS after 1st req (MiB)",  lambda rd: rd.get("rss",     {}).get("firstRequest")),
+        ("RSS under load (MiB)",     lambda rd: rd.get("load",    {}).get("rss")),
+        ("Throughput (req/s)",       lambda rd: rd.get("load",    {}).get("throughput")),
+        ("Throughput density",       lambda rd: rd.get("load",    {}).get("throughputDensity")),
+    ]
+
+    # Determine maximum n across all metrics/runtimes for the low-n warning
+    max_n = 0
+    for r in runtimes:
+        for _, fn in METRICS_DEF:
+            vals = fn(results[r]) or []
+            max_n = max(max_n, len(vals))
+
+    parts = ["## Statistical Significance"]
+
+    if max_n < 2:
+        parts.append(
+            "> ⚠️ **n = 1:** Standard deviation, confidence intervals, and significance tests "
+            "require at least 2 observations. Run more iterations (`--iterations 3` or more) "
+            "for robust statistics."
+        )
+        return "\n\n".join(parts)
+
+    if max_n < 5:
+        parts.append(
+            f"> ⚠️ **Low sample size (n ≤ {max_n}):** Tests have limited statistical power. "
+            "Treat p-values and effect sizes as directional indicators only — "
+            "run ≥ 5 iterations for reliable conclusions."
+        )
+
+    pairs = list(itertools.combinations(runtimes, 2))
+
+    for metric_name, extractor in METRICS_DEF:
+        # Collect per-runtime data
+        metric_data: dict[str, list] = {}
+        for r in runtimes:
+            metric_data[r] = [v for v in (extractor(results[r]) or []) if v is not None]
+
+        # Skip metric if no runtime has any data
+        if all(len(v) == 0 for v in metric_data.values()):
+            continue
+
+        # Descriptive stats table
+        desc_headers = ["Runtime", "n", "Mean", "Std", "CV%", "95% CI"]
+        desc_rows = []
+        for r in runtimes:
+            vals = metric_data[r]
+            n = len(vals)
+            if n == 0:
+                desc_rows.append([f"`{r}`", "0", "—", "—", "—", "—"])
+                continue
+            mu  = sum(vals) / n
+            sd  = _stdev(vals)
+            cv  = _cv(vals)
+            ci  = _ci95(vals)
+            mu_s  = _safe(mu, 2)
+            sd_s  = _safe(sd, 2) if sd is not None else "—"
+            cv_s  = f"{cv:.1f}%" if cv is not None else "—"
+            if ci:
+                ci_s = f"[{_safe(ci[0], 2)}, {_safe(ci[1], 2)}]"
+            else:
+                ci_s = f"{mu_s} (n=1)"
+            desc_rows.append([f"`{r}`", str(n), mu_s, sd_s, cv_s, ci_s])
+
+        # Pairwise tests
+        test_rows = []
+        for r_a, r_b in pairs:
+            a_vals = metric_data[r_a]
+            b_vals = metric_data[r_b]
+            if len(a_vals) < 2 or len(b_vals) < 2:
+                test_rows.append([f"`{r_a}` vs `{r_b}`", "—", "—"])
+                continue
+            d = _cohen_d(a_vals, b_vals)
+            p = _welch_p(a_vals, b_vals)
+            if d is not None:
+                mag = abs(d)
+                label = ("negligible" if mag < 0.2 else
+                         "small"      if mag < 0.5 else
+                         "medium"     if mag < 0.8 else "large")
+                d_s = f"{d:.2f} ({label})"
+            else:
+                d_s = "—"
+            if p is not None:
+                sig = "✓ significant" if p < 0.05 else "✗ not significant"
+                p_s = f"{p:.3f} ({sig})"
+            else:
+                p_s = "—"
+            test_rows.append([f"`{r_a}` vs `{r_b}`", d_s, p_s])
+
+        section_parts = [
+            f"### {metric_name}",
+            _table(desc_headers, desc_rows),
+        ]
+        if test_rows:
+            section_parts.append(
+                _table(["Comparison", "Cohen's d", "Welch p-value"], test_rows)
+            )
+        parts.append("\n\n".join(section_parts))
+
+    return "\n\n".join(parts)
+
+
+def section_statistical_legend() -> str:
+    rows = [
+        [
+            "**[CV%](https://en.wikipedia.org/wiki/Coefficient_of_variation)** "
+            "(Coefficient of Variation)",
+            "Standard deviation expressed as a percentage of the mean. "
+            "Measures run-to-run consistency. "
+            "CV% < 5% → very stable · 5–15% → moderate · > 15% → noisy.",
+        ],
+        [
+            "**[95% CI](https://en.wikipedia.org/wiki/Confidence_interval)** "
+            "(Confidence Interval)",
+            "Range that would contain the true mean in 95% of repeated experiments "
+            "(t-distribution, two-tailed). Wider CI = more uncertainty.",
+        ],
+        [
+            "**[Cohen's d](https://en.wikipedia.org/wiki/Effect_size#Cohen's_d)** "
+            "(Effect Size)",
+            "Standardised difference between two means using pooled standard deviation. "
+            "Magnitude: < 0.2 negligible · 0.2–0.5 small · 0.5–0.8 medium · ≥ 0.8 large. "
+            "Tells you *how big* a difference is, not just whether it's real.",
+        ],
+        [
+            "**[Welch p-value](https://en.wikipedia.org/wiki/Welch%27s_t-test)** "
+            "(Two-tailed Welch's t-test)",
+            "Probability of observing a difference at least this large by chance alone, "
+            "assuming the two runtimes perform identically. "
+            "p < 0.05 → statistically significant at the 95% confidence level. "
+            "Does not assume equal variances.",
+        ],
+    ]
+    table = _table(["Measure", "Meaning"], rows)
+    return (
+        "## Statistical Notes\n\n"
+        + table
+        + "\n\n"
+        "> Statistical tests require **n ≥ 2** iterations. "
+        "With n < 5 the results are directionally informative but unreliable — "
+        "prefer **n ≥ 5** for robust conclusions."
+    )
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
@@ -712,6 +1021,7 @@ def generate_report(log_path: Path) -> str:
     if has_native:
         sections += ["---", section_native_stats(metrics)]
 
+    stats_section = section_statistics(metrics)
     sections += [
         "---",
         section_raw_measurements(metrics),
@@ -721,8 +1031,10 @@ def generate_report(log_path: Path) -> str:
         section_analysis(metrics),
         "---",
         section_key_tradeoffs(metrics),
-        footer,
     ]
+    if stats_section:
+        sections += ["---", stats_section, "---", section_statistical_legend()]
+    sections.append(footer)
 
     return "\n\n".join(sections)
 

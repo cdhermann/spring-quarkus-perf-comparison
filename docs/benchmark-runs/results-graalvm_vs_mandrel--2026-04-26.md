@@ -66,52 +66,52 @@
 
 ### Build Time (seconds)
 
-|Runtime|I0|Average|
-|---|---|---|
-|`quarkus3-native`|155.63|**155.63**|
-|`quarkus3-native-mandrel`|151.28|**151.28**|
+|Runtime|I0|Average|Std|CV%|
+|---|---|---|---|---|
+|`quarkus3-native`|155.63|**155.63**|—|—|
+|`quarkus3-native-mandrel`|151.28|**151.28**|—|—|
 
 ### Time to First Request (milliseconds)
 
-|Runtime|I0|Average|
-|---|---|---|
-|`quarkus3-native`|121.85|**121.85**|
-|`quarkus3-native-mandrel`|111.38|**111.38**|
+|Runtime|I0|Average|Std|CV%|
+|---|---|---|---|---|
+|`quarkus3-native`|121.85|**121.85**|—|—|
+|`quarkus3-native-mandrel`|111.38|**111.38**|—|—|
 
 ### RSS at Startup — before any request (MiB)
 
-|Runtime|I0|Average|
-|---|---|---|
-|`quarkus3-native`|89.65|**89.65**|
-|`quarkus3-native-mandrel`|89.73|**89.73**|
+|Runtime|I0|Average|Std|CV%|
+|---|---|---|---|---|
+|`quarkus3-native`|89.65|**89.65**|—|—|
+|`quarkus3-native-mandrel`|89.73|**89.73**|—|—|
 
 ### RSS after First Request (MiB)
 
-|Runtime|I0|Average|
-|---|---|---|
-|`quarkus3-native`|95.66|**95.66**|
-|`quarkus3-native-mandrel`|95.66|**95.66**|
+|Runtime|I0|Average|Std|CV%|
+|---|---|---|---|---|
+|`quarkus3-native`|95.66|**95.66**|—|—|
+|`quarkus3-native-mandrel`|95.66|**95.66**|—|—|
 
 ### RSS under Load (MiB)
 
-|Runtime|I0|Average|
-|---|---|---|
-|`quarkus3-native`|291.77|**291.77**|
-|`quarkus3-native-mandrel`|291.14|**291.14**|
+|Runtime|I0|Average|Std|CV%|
+|---|---|---|---|---|
+|`quarkus3-native`|291.77|**291.77**|—|—|
+|`quarkus3-native-mandrel`|291.14|**291.14**|—|—|
 
 ### Throughput (req/sec)
 
-|Runtime|I0|Average|
-|---|---|---|
-|`quarkus3-native`|8,550|**8,550**|
-|`quarkus3-native-mandrel`|8,741|**8,741**|
+|Runtime|I0|Average|Std|CV%|
+|---|---|---|---|---|
+|`quarkus3-native`|8,550|**8,550**|—|—|
+|`quarkus3-native-mandrel`|8,741|**8,741**|—|—|
 
 ### Throughput Density (req/sec per MiB of RSS under load)
 
-|Runtime|I0|Max|
-|---|---|---|
-|`quarkus3-native`|29.31|**29.31**|
-|`quarkus3-native-mandrel`|30.02|**30.02**|
+|Runtime|I0|Max|Std|CV%|
+|---|---|---|---|---|
+|`quarkus3-native`|29.31|**29.31**|—|—|
+|`quarkus3-native-mandrel`|30.02|**30.02**|—|—|
 
 ---
 
@@ -180,6 +180,25 @@
 |Lowest memory footprint (load)|`quarkus3-native-mandrel` (291.1)|
 |Best throughput per MiB of RAM|`quarkus3-native-mandrel` (30.0)|
 |Fastest build|`quarkus3-native-mandrel` (151.3)|
+
+---
+
+## Statistical Significance
+
+> ⚠️ **n = 1:** Standard deviation, confidence intervals, and significance tests require at least 2 observations. Run more iterations (`--iterations 3` or more) for robust statistics.
+
+---
+
+## Statistical Notes
+
+|Measure|Meaning|
+|---|---|
+|**[CV%](https://en.wikipedia.org/wiki/Coefficient_of_variation)** (Coefficient of Variation)|Standard deviation expressed as a percentage of the mean. Measures run-to-run consistency. CV% < 5% → very stable · 5–15% → moderate · > 15% → noisy.|
+|**[95% CI](https://en.wikipedia.org/wiki/Confidence_interval)** (Confidence Interval)|Range that would contain the true mean in 95% of repeated experiments (t-distribution, two-tailed). Wider CI = more uncertainty.|
+|**[Cohen's d](https://en.wikipedia.org/wiki/Effect_size#Cohen's_d)** (Effect Size)|Standardised difference between two means using pooled standard deviation. Magnitude: < 0.2 negligible · 0.2–0.5 small · 0.5–0.8 medium · ≥ 0.8 large. Tells you *how big* a difference is, not just whether it's real.|
+|**[Welch p-value](https://en.wikipedia.org/wiki/Welch%27s_t-test)** (Two-tailed Welch's t-test)|Probability of observing a difference at least this large by chance alone, assuming the two runtimes perform identically. p < 0.05 → statistically significant at the 95% confidence level. Does not assume equal variances.|
+
+> Statistical tests require **n ≥ 2** iterations. With n < 5 the results are directionally informative but unreliable — prefer **n ≥ 5** for robust conclusions.
 
 
 ---
