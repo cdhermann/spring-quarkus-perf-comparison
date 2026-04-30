@@ -293,7 +293,17 @@ scripts:
                     key: RUN.config.repo.scenarioName
                     value: ${{config.repo.scenario}}
 
+  cleanup-ports:
+    - log: Cleaning up leftover processes on port 8080 and Java/dotnet processes
+    - sh: "lsof -i :8080 -t 2>/dev/null | xargs -r kill -9 || true"
+    - sh: "sleep 1"
+    - sh: "pkill -f 'java.*quarkus' || true"
+    - sh: "pkill -f 'java.*dotnet' || true"
+    - sh: "pkill -f '/dotnet' || true"
+    - sh: "sleep 1"
+
   cleanup-env:
+    - script: cleanup-ports
     - sh: rm -Rf ${{PROJ_REPO_DIR}}
 
   config-env:
@@ -521,11 +531,13 @@ scripts:
 
   measure-time-to-first-request:
     - log: Measuring Time to first request
+    - script: cleanup-ports
     - sh: java -version
     - sh: cd ${{RUNTIMECMD.dir}}
     - for-each: ITERATION ${{=[...Array(${{config.num_iterations}}).keys()]}}
       then:
         - queue-download: ${{REPO_DIR}}/logs/measure-time-to-first-request-${{RUNTIMECMD.name}}-${{ITERATION}}.log
+        - script: cleanup-ports
         - script: start-test-services
         - script: sync-drop-fs-cache
         - sh: timeout 60s bash -c "taskset --cpu-list ${{config.resources.cpu.1st_request}} ${{HELPER_SCRIPTS_DIR}}/time-to-1st-request.sh '${{RUNTIMECMD.runCmd}}' '${{TARGET_URL}}' '${{REPO_DIR}}/logs/measure-time-to-first-request-${{RUNTIMECMD.name}}-${{ITERATION}}.log'"
@@ -551,11 +563,13 @@ scripts:
 
   measure-rss:
     - log: Measuring RSS
+    - script: cleanup-ports
     - sh: java -version
     - sh: cd ${{RUNTIMECMD.dir}}
     - for-each: ITERATION ${{=[...Array(${{config.num_iterations}}).keys()]}}
       then:
         - queue-download: ${{REPO_DIR}}/logs/measure-rss-${{RUNTIMECMD.name}}-${{ITERATION}}.log
+        - script: cleanup-ports
         - script: start-test-services
         - script: sync-drop-fs-cache
         - sh: ${{RUNTIMECMD.runCmd}} &>${{REPO_DIR}}/logs/measure-rss-${{RUNTIMECMD.name}}-${{ITERATION}}.log &
@@ -590,6 +604,7 @@ scripts:
 
   run-load-test:
     - log: Running workload
+    - script: cleanup-ports
     - sh: cd ${{RUNTIMECMD.dir}}
     - set-state: RUNTIME_NAME ${{RUNTIMECMD.name}}
     - set-state:
@@ -604,6 +619,7 @@ scripts:
         - queue-download: ${{REPO_DIR}}/logs/wrk-warmup-${{RUNTIMECMD.name}}-${{ITERATION}}.log
         - queue-download: ${{LOG_FILE}}
         - queue-download: ${{REPO_DIR}}/logs/wrk-${{RUNTIMECMD.name}}-${{ITERATION}}.log
+        - script: cleanup-ports
         - script: start-test-services
         - script: sync-drop-fs-cache
         - set-signal: LOAD_STEADY_STATE_START 1
